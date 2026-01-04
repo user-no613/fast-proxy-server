@@ -1,59 +1,49 @@
 const http = require('http');
 const net = require('net');
+const url = require('url');
 
 const PORT = process.env.PORT || 10000;
 
 const server = http.createServer((req, res) => {
-  // 1. Handle "Ping" checks (for Cron jobs)
   if (req.url === '/' || req.url === '/ping') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Proxy is active. Pong!');
-    return;
+    res.writeHead(200); res.end('Proxy is Stealthy.'); return;
   }
 
-  // 2. Handle Basic HTTP Requests
-  // (We return 404 because we primarily want to use this as a Tunnel)
-  console.log(`[HTTP] Blocked direct request to: ${req.url}`);
-  res.writeHead(404);
-  res.end();
+  const parsedUrl = url.parse(req.url);
+  
+  // STEALTH: Copy real browser headers but change the Host
+  const headers = { ...req.headers };
+  headers['host'] = parsedUrl.hostname;
+  headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  const proxyOptions = {
+    hostname: parsedUrl.hostname,
+    port: parsedUrl.port || 80,
+    path: parsedUrl.path,
+    method: req.method,
+    headers: headers
+  };
+
+  const proxyReq = http.request(proxyOptions, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+
+  req.pipe(proxyReq, { end: true });
+  proxyReq.on('error', () => res.end());
 });
 
-// 3. Handle The VPN Tunnel (CONNECT methods)
+// CONNECT (HTTPS Tunneling) remains the same
 server.on('connect', (req, clientSocket, head) => {
-  // Use 'try-catch' to prevent crashes on bad URLs
-  try {
-    const { port, hostname } = new URL(`http://${req.url}`);
-
-    console.log(`[CONNECT] Opening tunnel to ${hostname}:${port}`);
-
-    const serverSocket = net.connect(port || 443, hostname, () => {
-      // Success! Tell Chrome the tunnel is open.
-      clientSocket.write(
-        'HTTP/1.1 200 Connection Established\r\n' +
-        'Proxy-agent: Node-VPN\r\n' +
-        '\r\n'
-      );
-      serverSocket.write(head);
-      serverSocket.pipe(clientSocket);
-      clientSocket.pipe(serverSocket);
-    });
-
-    serverSocket.on('error', (err) => {
-      // console.error(`[REMOTE-ERR] ${hostname}: ${err.message}`);
-      clientSocket.end();
-    });
-
-    clientSocket.on('error', (err) => {
-      // console.error(`[CLIENT-ERR] ${err.message}`);
-      serverSocket.end();
-    });
-
-  } catch (err) {
-    console.error(`[URL-ERROR] Could not parse: ${req.url}`);
-    clientSocket.end();
-  }
+  const { port, hostname } = url.parse(`//${req.url}`);
+  const serverSocket = net.connect(port || 443, hostname, () => {
+    clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+    serverSocket.write(head);
+    serverSocket.pipe(clientSocket);
+    clientSocket.pipe(serverSocket);
+  });
+  serverSocket.on('error', () => clientSocket.end());
+  clientSocket.on('error', () => serverSocket.end());
 });
 
-server.listen(PORT, () => {
-  console.log(`✅ Server ready on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Stealth Proxy on ${PORT}`));
