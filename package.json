@@ -1,0 +1,13 @@
+{
+  "name": "simple-proxy",
+  "version": "1.0.0",
+  "description": "My proxy server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
