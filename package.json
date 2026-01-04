@@ -1,13 +1,14 @@
 {
-  "name": "simple-proxy",
+  "name": "fast-proxy",
   "version": "1.0.0",
-  "description": "My proxy server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=16.0.0"
   }
 }
